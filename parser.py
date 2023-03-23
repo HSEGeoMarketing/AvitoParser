@@ -1,42 +1,70 @@
-from bs4 import BeautifulSoup
-from geopy.geocoders import Nominatim
+import re
 import requests
+from bs4 import BeautifulSoup
 import psycopg2
 
-conn = psycopg2.connect('postgres://postgres:1111@localhost:5432/dbavito')
-cur = conn.cursor()
-cur.execute('''CREATE TABLE COMMERCIAL_PREMISES 
-     (SQUARE DOUBLE PRECISION NOT NULL,
-     PRICE INT NOT NULL,
-     LATITUDE DOUBLE PRECISION NOT NULL,
-     LONGITUDE DOUBLE PRECISION NOT NULL,
-     LINK VARCHAR)
-    ''')
+# Подключение к базе данных
+conn = psycopg2.connect(database="db_avito", user="postgres", password="1111", host="localhost", port="5432")
+cursor = conn.cursor()
 
-product = input()
-geolocator = Nominatim(user_agent="Tester")
-url = "https://www.avito.ru/sankt-peterburg/nedvizhimost?q=" + product
-request = requests.get(url)
-bs = BeautifulSoup(request.text, "html.parser")
-all_squares = bs.find_all("span", class_="desktop-3a1zuq")
-all_addresses = bs.find_all("a", class_="geo-address-9QndR")
-all_prices = bs.find_all("span", class_="price-price-38bRa")
-all_links = bs.find_all("a",
-                        class_="title-root-zZCwT body-title-drnL0 title-root_maxHeight-X6PsH text-text-LurtD text-size-s-BxGpL text-bold-SinUO")
-
-for i in range(len(all_squares)):
-    square = all_squares[i].text.replace(",", ".")
-    price = all_prices[i].text.strip().replace(" ", "")
-    location = geolocator.geocode(all_addresses[i].text)
-    if location:
-        lat = location.latitude
-        long = location.longitude
-    else:
-        lat, long = None, None
-    link = "https://www.avito.ru" + all_links[i]['href']
-    cur.execute(
-        "INSERT INTO COMMERCIAL_PREMISES (SQUARE, PRICE, LATITUDE, LONGITUDE, LINK) VALUES (%s, %s, %s, %s, %s)",
-        (square, price, lat, long, link))
-
+# Создание таблицы, если она еще не существует
+cursor.execute('''CREATE TABLE IF NOT EXISTS COMMERCIAL_PREMISES (
+                        ID SERIAL PRIMARY KEY,
+                        SQUARE DOUBLE PRECISION,
+                        PRICE INT,
+                        ADDRESS TEXT,
+                        LATITUDE DOUBLE PRECISION,
+                        LONGITUDE DOUBLE PRECISION,
+                        LINK TEXT)''')
 conn.commit()
+
+# URL для поиска торговых площадей на Авито
+url = "https://www.avito.ru/sankt-peterburg/kommercheskaya_nedvizhimost/prodam-ASgBAgICAUSSA8YQ"
+
+# Загрузка страницы и парсинг HTML
+response = requests.get(url)
+soup = BeautifulSoup(response.content, 'html.parser')
+
+# Поиск всех объявлений о продаже торговых площадей на странице
+ads = soup.find_all('div', {'class': 'iva-item-root-Nj_hb'})
+
+# Обход каждого объявления и извлечение данных
+for ad in ads:
+    link = ad.find('a', {'class': 'link-link-39EVK'})
+    if link:
+        href = link.get('href')
+        url = f'https://www.avito.ru{href}'
+
+        price = ad.find('span', {'class': 'price-price-32bra'}).text.strip().replace(' ', '')
+
+        square = None
+        square_regex = r'(\d+\.\d+) м²'
+        square_match = re.search(square_regex, ad.text)
+        if square_match:
+            square = square_match.group(1)
+
+        address = ad.find('span', {'class': 'geo-address-9QndR'})
+        if address:
+            address = address.text.strip()
+
+        lat, lon = None, None
+        map_link = ad.find('a', {'class': 'item__map'})
+        if map_link:
+            map_url = map_link.get('href')
+            map_response = requests.get(map_url)
+            map_soup = BeautifulSoup(map_response.content, 'html.parser')
+            map_script = map_soup.find('script', {'type': 'application/json'})
+            if map_script:
+                map_data = map_script.text
+                lat_lon_regex = r'"coordinates":\[(\d+\.\d+),(\d+\.\d+)\]'
+                lat_lon_match = re.search(lat_lon_regex, map_data)
+                if lat_lon_match:
+                    lat = float(lat_lon_match.group(1))
+                    lon = float(lat_lon_match.group(2))
+
+        cursor.execute('''INSERT INTO COMMERCIAL_PREMISES 
+                          (SQUARE, PRICE, ADDRESS, LATITUDE, LONGITUDE, LINK) 
+                          VALUES (%s, %s, %s, %s, %s, %s)''', (square, price, address, lat, lon, url))
+        conn.commit()
+
 conn.close()
