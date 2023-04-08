@@ -3,15 +3,21 @@ import re
 import aiohttp as aiohttp
 from bs4 import BeautifulSoup
 import asyncpg
+import random
+import time
 
 
-async def fetch(url):
-    async with aiohttp.ClientSession() as session:
-        async with session.get(url) as response:
+async def fetch(url, headers=None, proxy=None):
+    async with aiohttp.ClientSession(headers=headers) as session:
+        async with session.get(url, proxy=proxy) as response:
             return await response.text()
 
 
 async def parse_page(url, conn):
+    # Имитация естественного поведения
+    delay = random.uniform(1, 3)  # Случайная задержка от 1 до 3 секунд
+    await asyncio.sleep(delay)
+
     html = await fetch(url)
     soup = BeautifulSoup(html, 'html.parser')
     ads = soup.find_all('div', {'class': 'iva-item-root-Nj_hb'})
@@ -57,20 +63,15 @@ async def main():
                             ADDRESS TEXT,
                             LATITUDE DOUBLE PRECISION,
                             LONGITUDE DOUBLE PRECISION,
-                            LINK TEXT)''')
-    await conn.close()
-    html = await fetch("https://www.avito.ru/sankt-peterburg/kommercheskaya_nedvizhimost/prodam-ASgBAgICAUSSA8YQ")
-    soup = BeautifulSoup(html, 'html.parser')
-    last_page = int(soup.find("span", {"class": "pagination-page"}).text)
-
-    urls = [f"https://www.avito.ru/sankt-peterburg/kommercheskaya_nedvizhimost/prodam-ASgBAgICAUSSA8YQ?p={page}" for
-            page in range(1, last_page + 1)]
+LINK TEXT);''')
+    urls = ['https://www.avito.ru/moskva/kommercheskaya_nedvizhimost/prodam',
+            'https://www.avito.ru/moskva/kommercheskaya_nedvizhimost/prodam?p=2',
+            'https://www.avito.ru/moskva/kommercheskaya_nedvizhimost/prodam?p=3']
 
     tasks = []
     for url in urls:
-        tasks.append(asyncio.ensure_future(parse_page(url, conn)))
+        tasks.append(parse_page(url, conn))
+
     await asyncio.gather(*tasks)
 
-
-if __name__ == '__main__':
-    asyncio.run(main())
+    await conn.close()
