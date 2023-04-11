@@ -46,7 +46,7 @@ while i != 101:
             link = item.find('a', class_='link-link-MbQDP')
             link = link.get('href')
             link = 'https://www.avito.ru' + link
-            with open('commercial_premises.csv', "a", encoding='utf-8') as file:
+            with open('commercial_premises.csv', "a", encoding='utf-8', newline='') as file:
                 writer = csv.writer(file)
                 writer.writerow(
                     (title.text.strip(), price.text.strip(), square, address.text.strip(), latitude,
