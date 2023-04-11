@@ -1,13 +1,14 @@
 from selenium import webdriver
 from geopy.geocoders import Nominatim
 from bs4 import BeautifulSoup
+import re
 import time
 import csv
 
 geolocator = Nominatim(user_agent="myGeocoder")
 with open('commercial_premises.csv', "w", encoding="utf-8") as file:
     writer = csv.writer(file)
-    writer.writerow(('Name', 'Price', 'Address', 'Latitude', 'Longitude', 'Link'))
+    writer.writerow(('Name', 'Price','Square', 'Address', 'Latitude', 'Longitude', 'Link'))
 
 i = 1
 
@@ -28,6 +29,14 @@ while i != 101:
             price = item.find('span', class_='price-text-_YGDY')
             address = item.find('div', class_='geo-address-fhHd0')
             location = geolocator.geocode(address.text.strip())
+
+            regex = r"(\d+(\.\d+)?)(\s?)(м²|м2|кв\.м)"
+            title_text = title.text.strip()  # Extract text from Tag object
+            match = re.search(regex, title_text)
+            if match:
+                square = match.group(1)  # Размер площади
+            else:
+                square = None
             if location is not None:
                 latitude = location.latitude
                 longitude = location.longitude
@@ -40,7 +49,7 @@ while i != 101:
             with open('commercial_premises.csv', "a", encoding='utf-8') as file:
                 writer = csv.writer(file)
                 writer.writerow(
-                    (title.text.strip(), price.text.strip(), address.text.strip(), latitude,
+                    (title.text.strip(), price.text.strip(), square, address.text.strip(), latitude,
                      longitude, link.strip()))
 
     except Exception as ex:
