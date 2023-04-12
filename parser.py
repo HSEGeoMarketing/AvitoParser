@@ -8,15 +8,15 @@ import csv
 geolocator = Nominatim(user_agent="myGeocoder")
 with open('commercial_premises.csv', "w", encoding="utf-8") as file:
     writer = csv.writer(file)
-    writer.writerow(('Name', 'Price','Square', 'Address', 'Latitude', 'Longitude', 'Link'))
+    writer.writerow(('Name', 'Price', 'Square', 'Address', 'Latitude', 'Longitude', 'Link'))
 
-i = 1
+# Specify the number of pages to parse
+num_pages = 100
 
-while i != 101:
-    URL = f'https://www.avito.ru/sankt-peterburg/kommercheskaya_nedvizhimost/sdam-ASgBAgICAUSwCNRW?cd={i}'
+for i in range(1, num_pages + 1):
+    URL = f'https://www.avito.ru/sankt-peterburg/kommercheskaya_nedvizhimost/sdam-ASgBAgICAUSwCNRW?cd={i}&p={i}'
     driver = webdriver.Chrome(
-        executable_path="C:\\Users\\Пользователь\\Desktop\\project\\parsing\\parser\\ChromeWebDriver\\chromedriver.exe"
-    )
+        executable_path="C:\\Users\\Пользователь\\Desktop\\project\\parsing\\parser\\ChromeWebDriver\\chromedriver.exe")
 
     try:
         driver.get(url=URL)
@@ -28,13 +28,20 @@ while i != 101:
             title = item.find('h3', class_='title-root-zZCwT')
             price = item.find('span', class_='price-text-_YGDY')
             address = item.find('div', class_='geo-address-fhHd0')
-            location = geolocator.geocode(address.text.strip())
+            location = None
+            if address:
+                address_text = address.text.strip()
+                if 'пр-т' in address_text:
+                    address_text = address_text.replace('пр-т', 'проспект')
+                if 'Санкт-Петербург' not in address_text:
+                    address_text = 'Санкт-Петербург, ' + address_text
+                location = geolocator.geocode(address_text)
 
             regex = r"(\d+(\.\d+)?)(\s?)(м²|м2|кв\.м)"
-            title_text = title.text.strip()  # Extract text from Tag object
-            match = re.search(regex, title_text)
+            title_text = title.text.strip() if title else None
+            match = re.search(regex, title_text) if title_text else None
             if match:
-                square = match.group(1)  # Размер площади
+                square = match.group(1)
             else:
                 square = None
             if location is not None:
@@ -44,17 +51,17 @@ while i != 101:
                 latitude = None
                 longitude = None
             link = item.find('a', class_='link-link-MbQDP')
-            link = link.get('href')
-            link = 'https://www.avito.ru' + link
+            link = link.get('href') if link else None
+            link = 'https://www.avito.ru' + link if link else None
+            price_text = price.text.replace('\xa0', '') if price else None
+
             with open('commercial_premises.csv', "a", encoding='utf-8', newline='') as file:
                 writer = csv.writer(file)
                 writer.writerow(
-                    (title.text.strip(), price.text.strip(), square, address.text.strip(), latitude,
-                     longitude, link.strip()))
+                    (title.text.strip() if title else None, price_text, square,
+                     address_text if address else None, latitude, longitude, link.strip() if link else None))
 
     except Exception as ex:
         print(ex)
     finally:
-        driver.close()
         driver.quit()
-    i += 1
