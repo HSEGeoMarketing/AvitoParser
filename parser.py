@@ -31,13 +31,18 @@ for i in range(1, num_pages + 1):
             location = None
             if address:
                 address_text = address.text.strip()
+                if '-я' in address_text:
+                    address_text = address_text.replace('-я', '')
+                if 'В.О.' or 'Васильевского острова' in address_text:
+                    address_text = address_text.replace('В.О.', '')
+                    address_text = address_text.replace('Васильевского острова', '')
                 if 'пр-т' in address_text:
                     address_text = address_text.replace('пр-т', 'проспект')
-                if 'Санкт-Петербург' not in address_text:
+                if 'Санкт-Петербург' not in address_text and 'Ленинградская область' not in address_text and 'пос' not in address_text and 'поселок' not in address_text:
                     address_text = 'Санкт-Петербург, ' + address_text
                 location = geolocator.geocode(address_text)
 
-            regex = r"(\d+(\.\d+)?)(\s?)(м²|м2|кв\.м)"
+            regex = r"(\d+(\.\d+)?)(\s?)(м²|м|м2|кв\.м)"
             title_text = title.text.strip() if title else None
             match = re.search(regex, title_text) if title_text else None
             if match:
