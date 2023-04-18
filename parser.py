@@ -1,9 +1,11 @@
+import psycopg2 as psycopg2
 from selenium import webdriver
 from geopy.geocoders import Nominatim
 from bs4 import BeautifulSoup
 import re
 import time
 import csv
+import pandas as pd
 
 geolocator = Nominatim(user_agent="myGeocoder")
 with open('commercial_premises.csv', "w", encoding="utf-8") as file:
@@ -38,7 +40,8 @@ for i in range(1, num_pages + 1):
                     address_text = address_text.replace('Васильевского острова', '')
                 if 'пр-т' in address_text:
                     address_text = address_text.replace('пр-т', 'проспект')
-                if 'Санкт-Петербург' not in address_text and 'Ленинградская область' not in address_text and 'пос' not in address_text and 'поселок' not in address_text:
+                if 'Санкт-Петербург' not in address_text and 'Ленинградская область' not in address_text \
+                        and 'пос' not in address_text and 'поселок' not in address_text:
                     address_text = 'Санкт-Петербург, ' + address_text
                 location = geolocator.geocode(address_text)
 
@@ -70,3 +73,51 @@ for i in range(1, num_pages + 1):
         print(ex)
     finally:
         driver.quit()
+
+# Connect to PostgreSQL
+conn = psycopg2.connect(
+    dbname="geo_marketing",
+    user="student",
+    host="46.148.230.201",
+    password="jDdKxbj@=vYdsRHe-pyfMGvQ$^F6BQhrD@yfCKHHdS9WPxu^Sk&mGceFeJG9p*g=S^qz!CWDdB!SrRc7bYpjPdTd2+TF4g?k55+?",  # укажите ваш пароль
+    port="5432",  # указать порт, если отличается от порта по умолчанию (5432)
+)
+
+cursor = conn.cursor()
+
+# Create Table
+create_table = '''
+CREATE TABLE IF NOT EXISTS commercial_premises (
+    id SERIAL PRIMARY KEY,
+    Name TEXT,
+    Price TEXT,
+    Square REAL,
+    Address TEXT,
+    Latitude REAL,
+    Longitude REAL,
+    Link TEXT
+);
+'''
+cursor.execute(create_table)
+
+# Import CSV
+data = pd.read_csv(r'commercial_premises.csv')
+
+# Insert DataFrame to Table
+for _, row in data.iterrows():
+    cursor.execute('''
+        INSERT INTO commercial_premises (Name, Price, Square, Address, Latitude, Longitude, Link)
+        VALUES (%s, %s, %s, %s, %s, %s, %s)
+    ''', (
+        row['Name'],
+        row['Price'],
+        row['Square'],
+        row['Address'],
+        row['Latitude'],
+        row['Longitude'],
+        row['Link']
+    ))
+
+conn.commit()
+cursor.close()
+conn.close()
