@@ -9,9 +9,10 @@ from models import Database, AvitoAd
 # class AvitoAd(Base):
 #     __tablename__ = 'avito_ads'
 
+#     title=Column(String)
 #     id = Column(Integer, primary_key=True)
 #     square = Column(Float)
-#     price = Column(Float)
+#     price = Column(String)
 #     address = Column(String)
 #     latitude = Column(Float)
 #     longitude = Column(Float)
