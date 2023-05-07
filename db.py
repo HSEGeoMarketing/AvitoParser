@@ -12,7 +12,7 @@ from models import Database, AvitoAd
 #     title=Column(String)
 #     id = Column(Integer, primary_key=True)
 #     square = Column(Float)
-#     price = Column(String)
+#     price = Column(Float)
 #     address = Column(String)
 #     latitude = Column(Float)
 #     longitude = Column(Float)
